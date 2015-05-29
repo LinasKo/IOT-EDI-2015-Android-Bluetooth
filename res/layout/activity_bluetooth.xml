@@ -25,10 +25,10 @@
             android:text="@string/off" />
 
         <Button
-            android:id="@+id/toggle"
+            android:id="@+id/request"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Toggle Send / Receive" />
+            android:text="Request" />
     </LinearLayout>
 
     <LinearLayout

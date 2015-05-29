@@ -1,4 +1,4 @@
-// Version 1.9.0
+// Version 2.0.0
 package com.example.iotedi2015lel;
 
 import java.io.BufferedReader;
@@ -40,7 +40,7 @@ public class BluetoothActivity extends Activity {
 	private Button offBtn;
 	private Button listBtn;
 	private Button findBtn;
-	private Button toggleBtn;
+	private Button requestBtn;
 	private TextView text;
 	private EditText num1;
 	private EditText num2;
@@ -59,6 +59,8 @@ public class BluetoothActivity extends Activity {
 	private ConnectThread connectionThread;
 	private DataThread dataThread;
 	private BluetoothSocket zSocket = null;
+	// Temp C`, Hum %, Graoundhum %, LightIntensity.
+	public static volatile int[] dataReceived = new int[4];
 
 	private String LOG_TAG_UUID = "UUID List";
 	private String LOG_TAG_PROGRESS = "Progress";
@@ -82,8 +84,6 @@ public class BluetoothActivity extends Activity {
 			findBtn.setEnabled(false);
 			text.setText("Status: not supported");
 
-			
-
 			Toast.makeText(getApplicationContext(), "Your device does not support Bluetooth", Toast.LENGTH_LONG).show();
 		} else {
 
@@ -94,6 +94,10 @@ public class BluetoothActivity extends Activity {
 			onBtn.setOnClickListener(new OnClickListener() {
 				@Override
 				public void onClick(View v) {
+					Log.d(LOG_TAG_PROGRESS, "data1 = " + dataReceived[0]);
+					Log.d(LOG_TAG_PROGRESS, "data2 = " + dataReceived[1]);
+					Log.d(LOG_TAG_PROGRESS, "data3 = " + dataReceived[2]);
+					Log.d(LOG_TAG_PROGRESS, "data4 = " + dataReceived[3]);
 					on(v);
 				}
 			});
@@ -157,14 +161,22 @@ public class BluetoothActivity extends Activity {
 				}
 			});
 
-			toggleBtn = (Button) findViewById(R.id.toggle);
-			toggleBtn.setOnClickListener(new OnClickListener() {
+			requestBtn = (Button) findViewById(R.id.request);
+			requestBtn.setOnClickListener(new OnClickListener() {
 
 				@Override
 				public void onClick(View v) {
-					REQUEST_MODE = !REQUEST_MODE;
-					logToast("Requesting = " + REQUEST_MODE, LOG_TAG_PROGRESS);
+					logToast("Request pressed.", LOG_TAG_PROGRESS);
+					if (zSocket != null && zSocket.isConnected()) {
+						REQUEST_MODE = true;
+						manageConnectedSocket(zSocket);
+					} else if (zSocket == null) {
+						logToast("zSocket is null", LOG_TAG_PROGRESS);
+					} else {
+						logToast("zSocket is not connected.", LOG_TAG_PROGRESS);
+					}
 				}
+
 			});
 
 			myListView = (ListView) findViewById(R.id.listView1);
@@ -404,8 +416,6 @@ public class BluetoothActivity extends Activity {
 			}
 
 			Log.d(LOG_TAG_PROGRESS, "Connection established");
-
-			// manageConnectedSocket(mmSocket);
 		}
 	}
 
@@ -459,21 +469,32 @@ public class BluetoothActivity extends Activity {
 
 		public void run() {
 			Log.d(LOG_TAG_PROGRESS, "Data Thread Started");
-			byte[] buffer = new byte[64]; // buffer store for the stream
+			byte[] buffer = new byte[16]; // buffer store for the stream
 			int bytes; // bytes returned from read()
 
 			// Keep listening to the InputStream until an exception occurs
-			while (true) {
+			int i = -1;
+			while (i < 4) {
 				Log.d(LOG_TAG_PROGRESS, "Will try?");
-				try { // Read from the InputStream
+				try {
 					Log.d(LOG_TAG_PROGRESS, "Will read?");
 					bytes = mmInStream.read(buffer);
-					String readMessage = new String(buffer, 0, bytes);
-					// Send the obtained bytes to the UI activity
-					Log.d(LOG_TAG_PROGRESS, "Now I should handle the input");
-					Log.d(LOG_TAG_PROGRESS, readMessage);
-					// mHandler.obtainMessage(MESSAGE_READ, bytes, -1,
-					// buffer).sendToTarget();
+					if (i != -1) {
+						String readMessage = new String(buffer, 0, bytes);
+						for (String s : readMessage.split("\n")) {
+							if (!s.equals("")) {
+								int readMessageInt = Integer.parseInt(s);
+								dataReceived[i] = readMessageInt;
+								i++;
+							}
+						}
+						// Send the obtained bytes to the UI activity
+						Log.d(LOG_TAG_PROGRESS, "Now I should handle the input");
+						Log.d(LOG_TAG_PROGRESS, readMessage);
+					}
+					else {
+						i++;
+					}
 				} catch (IOException e) {
 					Log.d(LOG_TAG_PROGRESS, "Cannot read input buffer. Error: " + e.getMessage());
 					break;

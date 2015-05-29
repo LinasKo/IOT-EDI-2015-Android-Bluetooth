@@ -32,8 +32,8 @@ public final class R {
         public static final int linearLayout1=0x7f080000;
         public static final int listView1=0x7f080006;
         public static final int paired=0x7f080004;
+        public static final int request=0x7f080003;
         public static final int search=0x7f080005;
-        public static final int toggle=0x7f080003;
         public static final int turnOff=0x7f080002;
         public static final int turnOn=0x7f080001;
         public static final int update=0x7f08000b;
