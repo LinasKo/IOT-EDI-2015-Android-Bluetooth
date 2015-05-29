@@ -49,6 +49,7 @@ public class BluetoothActivity extends Activity {
 	private String LOG_TAG_UUID = "UUID List";
 	private String LOG_TAG_PROGRESS = "Progress";
 	private final int MAX_NUMBER_OF_DEVICES = 20;
+	private final boolean secure_sockets = false; 
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -142,7 +143,7 @@ public class BluetoothActivity extends Activity {
 						}
 						if (myBluetoothAdapter.getBondedDevices().contains(device)) {
 							Log.d(LOG_TAG_PROGRESS, "Devices are paired. Attempting to establish connection.");
-							ConnectThread connectionThread = new ConnectThread(device, false);
+							ConnectThread connectionThread = new ConnectThread(device, secure_sockets);
 							connectionThread.start();
 						} else {
 							Log.d(LOG_TAG_PROGRESS, "Devices are not paired. Aborting.");
