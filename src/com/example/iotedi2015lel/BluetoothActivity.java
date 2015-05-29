@@ -1,14 +1,15 @@
-// Version 1.6.0
+// Version 1.7.0
 package com.example.iotedi2015lel;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
 
 import android.app.Activity;
-import android.app.Application;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
@@ -49,7 +50,8 @@ public class BluetoothActivity extends Activity {
 	private String LOG_TAG_UUID = "UUID List";
 	private String LOG_TAG_PROGRESS = "Progress";
 	private final int MAX_NUMBER_OF_DEVICES = 20;
-	private final boolean secure_sockets = false; 
+	private final boolean secure_sockets = true;
+	private final String MESSAGE = "request\n";
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -317,11 +319,11 @@ public class BluetoothActivity extends Activity {
 					mmSocket.close();
 					if (secure_sockets)
 						fallbackSocket = (BluetoothSocket) mmDevice.getClass()
-							.getMethod("createRfcommSocket", new Class[] { int.class }).invoke(mmDevice, 1);
+								.getMethod("createRfcommSocket", new Class[] { int.class }).invoke(mmDevice, 1);
 					else
 						fallbackSocket = (BluetoothSocket) mmDevice.getClass()
-						.getMethod("createInsecureRfcommSocket", new Class[] { int.class }).invoke(mmDevice, 1);
-				
+								.getMethod("createInsecureRfcommSocket", new Class[] { int.class }).invoke(mmDevice, 1);
+
 					fallbackSocket.connect();
 					Log.d(LOG_TAG_PROGRESS, "Connection successful.");
 				} catch (Exception e) {
@@ -336,10 +338,9 @@ public class BluetoothActivity extends Activity {
 				}
 			}
 
-			// Do work to manage the connection (in a separate thread)
-			// manageConnectedSocket(mmSocket);
-			Toast.makeText(getApplicationContext(), "I should now be connected", Toast.LENGTH_SHORT).show();
 			Log.d(LOG_TAG_PROGRESS, "Connection established");
+
+			manageConnectedSocket(mmSocket);
 		}
 
 		/** Will cancel an in-progress connection, and close the socket */
@@ -351,6 +352,107 @@ public class BluetoothActivity extends Activity {
 
 			} catch (IOException e) {
 				Log.d(LOG_TAG_PROGRESS, "failed. Socket not closed because of: " + e.getMessage());
+			}
+		}
+	}
+
+	private void manageConnectedSocket(BluetoothSocket mmSocket) {
+		DataThread dataThread = new DataThread(mmSocket);
+		dataThread.start();
+		//dataThread.write(MESSAGE);
+	}
+
+	private class DataThread extends Thread {
+		private final BluetoothSocket mmSocket;
+		private final InputStream mmInStream;
+		private final OutputStream mmOutStream;
+		
+		public int readResult;
+
+		public DataThread(BluetoothSocket socket) {
+			Log.d(LOG_TAG_PROGRESS, "DataThread initialized.");
+
+			mmSocket = socket;
+			InputStream tmpIn = null;
+			OutputStream tmpOut = null;
+
+			// Get the input and output streams, using temp objects because
+			// member streams are final
+			try {
+				Log.d(LOG_TAG_PROGRESS, "Obtaining data streams");
+				tmpIn = socket.getInputStream();
+				tmpOut = socket.getOutputStream();
+			} catch (IOException e) {
+				Log.d(LOG_TAG_PROGRESS, "At least one data stream was not obtained. Error: " + e.getMessage());
+			}
+
+			mmInStream = tmpIn;
+			mmOutStream = tmpOut;
+		}
+
+		/*
+		public void run() {
+			Log.d(LOG_TAG_PROGRESS, "Data Thread Started");
+			byte[] buffer = new byte[64]; // buffer store for the stream
+			int bytes; // bytes returned from read()
+
+			// Keep listening to the InputStream until an exception occurs
+			while (true) {
+				Log.d(LOG_TAG_PROGRESS, "Will try?");
+				try {
+					// Read from the InputStream
+					Log.d(LOG_TAG_PROGRESS, "Will read?");
+					bytes = mmInStream.read(buffer);
+					String readMessage = new String(buffer, 0, bytes);
+					// Send the obtained bytes to the UI activity
+					Log.d(LOG_TAG_PROGRESS, "Now I should handle the input");
+					// mHandler.obtainMessage(MESSAGE_READ, bytes, -1,
+					// buffer).sendToTarget();
+				} catch (IOException e) {
+					Log.d(LOG_TAG_PROGRESS, "Cannot read input buffer. Error: " + e.getMessage());
+					break;
+				}
+			}
+		}
+		*/
+		
+		public void run() {
+			Log.d(LOG_TAG_PROGRESS, "Data Thread Started");
+			byte[] buf = new byte[1];
+		    int tmpLen = 0;
+		    int readLen = 0;
+		    try {
+				while (readLen <= 1 && (tmpLen = mmInStream.read(buf, 0, 1)) > 0) {
+					readResult = buf[0];
+				    readLen += 1;
+				}
+			} catch (IOException e) {
+				Log.d(LOG_TAG_PROGRESS, "Data Thread Started" + e.getMessage());
+			}
+		}
+		
+
+		public void write(String input) {
+			Log.d(LOG_TAG_PROGRESS, "Sending \"" + MESSAGE + "\"");
+			byte[] msgBuffer = input.getBytes(); // converts entered String into
+													// bytes
+			try {
+				mmOutStream.write(msgBuffer); // write bytes over BT connection
+												// via outstream
+			} catch (IOException e) {
+				// if you cannot write, close the application
+				Log.d(LOG_TAG_PROGRESS, "Connection failure." + e.getMessage());
+				finish();
+			}
+		}
+
+		/* Call this from the main activity to shutdown the connection */
+		public void cancel() {
+			try {
+				Log.d(LOG_TAG_PROGRESS, "Closing socket");
+				mmSocket.close();
+			} catch (IOException e) {
+				Log.d(LOG_TAG_PROGRESS, "Socket cannot be closed." + e.getMessage());
 			}
 		}
 	}
