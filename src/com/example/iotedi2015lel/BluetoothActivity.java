@@ -1,11 +1,14 @@
+// Version 1.5.0
 package com.example.iotedi2015lel;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
 
 import android.app.Activity;
+import android.app.Application;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
@@ -37,6 +40,7 @@ public class BluetoothActivity extends Activity {
 	private BluetoothAdapter myBluetoothAdapter;
 	private Set<BluetoothDevice> pairedDevices;
 	private BluetoothDevice[] foundDevices;
+	private boolean discovered = false;
 	private int found_index;
 	private ListView myListView;
 	private ArrayAdapter<String> BTArrayAdapter;
@@ -83,8 +87,12 @@ public class BluetoothActivity extends Activity {
 
 				@Override
 				public void onClick(View v) {
-					Log.d(LOG_TAG_PROGRESS, "Clicked on 'Paired List' button");
-					list(v);
+					if (discovered) {
+						logToast("Clicked on 'Paired List' button", LOG_TAG_PROGRESS);
+						list(v);
+					} else {
+						logToast("Rejected as not discovered. Please search for nearby devices first", LOG_TAG_PROGRESS);
+					}
 				}
 			});
 
@@ -93,7 +101,8 @@ public class BluetoothActivity extends Activity {
 
 				@Override
 				public void onClick(View v) {
-					Log.d(LOG_TAG_PROGRESS, "Clicked on 'Search Devices' button");
+					logToast("Searching", LOG_TAG_PROGRESS);
+					discovered = true;
 					find(v);
 				}
 			});
@@ -114,19 +123,23 @@ public class BluetoothActivity extends Activity {
 					BluetoothDevice device = foundDevices[arg2];
 					Toast.makeText(getApplicationContext(), "trying to pair and (or) connect to: " + device.getName(),
 							Toast.LENGTH_SHORT).show();
-					Log.d(LOG_TAG_PROGRESS, "Communicating with " + device.getName());
-					if (!myBluetoothAdapter.getBondedDevices().contains(device)) {
-						Log.d(LOG_TAG_PROGRESS, "Device not paired with. Pairing");
-						pairDevice(device);
-					}
-					if (myBluetoothAdapter.getBondedDevices().contains(device)) {
-						Log.d(LOG_TAG_PROGRESS, "Devices are paired. Attempting to establish connection.");
-						ConnectThread connectionThread = new ConnectThread(device);
-						connectionThread.start();
+					if (!Arrays.asList(foundDevices).contains(device)) {
+						logToast("Device is not in reach. Aborting.", LOG_TAG_PROGRESS);
 					} else {
-						Log.d(LOG_TAG_PROGRESS, "Devices are not paired. Aborting.");
-						Toast.makeText(getApplicationContext(), "Devices are not paired. Aborting.", Toast.LENGTH_SHORT)
-								.show();
+						Log.d(LOG_TAG_PROGRESS, "Communicating with " + device.getName());
+						if (!myBluetoothAdapter.getBondedDevices().contains(device)) {
+							Log.d(LOG_TAG_PROGRESS, "Device not paired with. Pairing");
+							pairDevice(device);
+						}
+						if (myBluetoothAdapter.getBondedDevices().contains(device)) {
+							Log.d(LOG_TAG_PROGRESS, "Devices are paired. Attempting to establish connection.");
+							ConnectThread connectionThread = new ConnectThread(device);
+							connectionThread.start();
+						} else {
+							Log.d(LOG_TAG_PROGRESS, "Devices are not paired. Aborting.");
+							Toast.makeText(getApplicationContext(), "Devices are not paired. Aborting.",
+									Toast.LENGTH_SHORT).show();
+						}
 					}
 				}
 			});
@@ -238,6 +251,7 @@ public class BluetoothActivity extends Activity {
 
 	private class ConnectThread extends Thread {
 		private final BluetoothSocket mmSocket;
+		private BluetoothSocket fallbackSocket;
 		private final BluetoothDevice mmDevice;
 
 		public ConnectThread(BluetoothDevice device) {
@@ -268,7 +282,7 @@ public class BluetoothActivity extends Activity {
 		}
 
 		public void run() {
-			logToast("Connection thread started.", LOG_TAG_PROGRESS);
+			Log.d(LOG_TAG_PROGRESS, "Connection thread started.");
 
 			// Cancel discovery because it will slow down the connection
 			myBluetoothAdapter.cancelDiscovery();
@@ -277,16 +291,25 @@ public class BluetoothActivity extends Activity {
 				// Connect the device through the socket. This will block
 				// until it succeeds or throws an exception
 				mmSocket.connect();
-				logToast("Socket connected.", LOG_TAG_PROGRESS);
+				Log.d(LOG_TAG_PROGRESS, "Socket connected.");
 			} catch (IOException connectException) {
-				// Unable to connect; close the socket and get out
+				Log.d(LOG_TAG_PROGRESS, "Closing first socket. Trying fallback socket.");
 				try {
 					mmSocket.close();
-					logToast("failed. Socket closed because of: " + connectException.getMessage(), LOG_TAG_PROGRESS);
-				} catch (IOException closeException) {
-					logToast("failed. Socket NOT closed because of: " + closeException.getMessage(), LOG_TAG_PROGRESS);
+					fallbackSocket = (BluetoothSocket) mmDevice.getClass()
+							.getMethod("createRfcommSocket", new Class[] { int.class }).invoke(mmDevice, 1);
+					fallbackSocket.connect();
+					Log.d(LOG_TAG_PROGRESS, "Connection successful.");
+				} catch (Exception e) {
+					Log.d(LOG_TAG_PROGRESS, "Closing socket. failed because of " + e.getMessage());
+					try {
+						fallbackSocket.close();
+						Log.d(LOG_TAG_PROGRESS, "Socket closed");
+					} catch (IOException closeException) {
+						Log.d(LOG_TAG_PROGRESS, "failed. Socket NOT closed because of: " + closeException.getMessage());
+					}
+					return;
 				}
-				return;
 			}
 
 			// Do work to manage the connection (in a separate thread)
@@ -307,7 +330,7 @@ public class BluetoothActivity extends Activity {
 			}
 		}
 	}
-	
+
 	private void logToast(String msg, String tag) {
 		Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT).show();
 		Log.d(tag, msg);
