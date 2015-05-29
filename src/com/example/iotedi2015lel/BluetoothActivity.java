@@ -41,6 +41,9 @@ public class BluetoothActivity extends Activity {
 	private ListView myListView;
 	private ArrayAdapter<String> BTArrayAdapter;
 
+	private String LOG_TAG_UUID = "UUID List";
+	private String LOG_TAG_PROGRESS = "Progress";
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -55,9 +58,7 @@ public class BluetoothActivity extends Activity {
 			findBtn.setEnabled(false);
 			text.setText("Status: not supported");
 
-			Toast.makeText(getApplicationContext(),
-					"Your device does not support Bluetooth", Toast.LENGTH_LONG)
-					.show();
+			Toast.makeText(getApplicationContext(), "Your device does not support Bluetooth", Toast.LENGTH_LONG).show();
 		} else {
 			text = (TextView) findViewById(R.id.text);
 			onBtn = (Button) findViewById(R.id.turnOn);
@@ -82,18 +83,7 @@ public class BluetoothActivity extends Activity {
 
 				@Override
 				public void onClick(View v) {
-
-					// TODO #1 debugging to show uuid format
-					
-					for (BluetoothDevice d0 : myBluetoothAdapter
-							.getBondedDevices()) {
-						String msg = d0.getName();
-						for (ParcelUuid uuid : d0.getUuids()) {
-							msg += "\n" + uuid.getUuid().toString();
-						}
-						Log.d("UUIDS List", msg);
-					}
-
+					Log.d(LOG_TAG_PROGRESS, "Clicked on 'Paired List' button");
 					list(v);
 				}
 			});
@@ -103,30 +93,41 @@ public class BluetoothActivity extends Activity {
 
 				@Override
 				public void onClick(View v) {
+					Log.d(LOG_TAG_PROGRESS, "Clicked on 'Search Devices' button");
 					find(v);
 				}
 			});
 
 			myListView = (ListView) findViewById(R.id.listView1);
-			foundDevices = new BluetoothDevice[20];
-			found_index = 0;
 
 			// create the arrayAdapter that contains the BTDevices, and set it
 			// to the ListView
-			BTArrayAdapter = new ArrayAdapter<String>(this,
-					android.R.layout.simple_list_item_1);
+
+			Log.d(LOG_TAG_PROGRESS, "New array adapter is initialized??? for some reason");
+			BTArrayAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
 			myListView.setAdapter(BTArrayAdapter);
 
+			Log.d(LOG_TAG_PROGRESS, "OnClickListener is set onto the list to establish connections");
 			myListView.setOnItemClickListener(new OnItemClickListener() {
 				@Override
-				public void onItemClick(AdapterView<?> arg0, View arg1,
-						int arg2, long arg3) {
+				public void onItemClick(AdapterView<?> arg0, View arg1, int arg2, long arg3) {
 					BluetoothDevice device = foundDevices[arg2];
-					Toast.makeText(getApplicationContext(), device.getName(),
+					Toast.makeText(getApplicationContext(), "trying to pair and (or) connect to: " + device.getName(),
 							Toast.LENGTH_SHORT).show();
-					pairDevice(device);
-					ConnectThread connectionThread = new ConnectThread(device);
-					connectionThread.start();
+					Log.d(LOG_TAG_PROGRESS, "Communicating with " + device.getName());
+					if (!myBluetoothAdapter.getBondedDevices().contains(device)) {
+						Log.d(LOG_TAG_PROGRESS, "Device not paired with. Pairing");
+						pairDevice(device);
+					}
+					if (myBluetoothAdapter.getBondedDevices().contains(device)) {
+						Log.d(LOG_TAG_PROGRESS, "Devices are paired. Attempting to establish connection.");
+						ConnectThread connectionThread = new ConnectThread(device);
+						connectionThread.start();
+					} else {
+						Log.d(LOG_TAG_PROGRESS, "Devices are not paired. Aborting.");
+						Toast.makeText(getApplicationContext(), "Devices are not paired. Aborting.", Toast.LENGTH_SHORT)
+								.show();
+					}
 				}
 			});
 		}
@@ -134,15 +135,12 @@ public class BluetoothActivity extends Activity {
 
 	public void on(View view) {
 		if (!myBluetoothAdapter.isEnabled()) {
-			Intent turnOnIntent = new Intent(
-					BluetoothAdapter.ACTION_REQUEST_ENABLE);
+			Intent turnOnIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
 			startActivityForResult(turnOnIntent, REQUEST_ENABLE_BT);
 
-			Toast.makeText(getApplicationContext(), "Bluetooth turned on",
-					Toast.LENGTH_LONG).show();
+			Toast.makeText(getApplicationContext(), "Bluetooth turned on", Toast.LENGTH_LONG).show();
 		} else {
-			Toast.makeText(getApplicationContext(), "Bluetooth is already on",
-					Toast.LENGTH_LONG).show();
+			Toast.makeText(getApplicationContext(), "Bluetooth is already on", Toast.LENGTH_LONG).show();
 		}
 	}
 
@@ -165,8 +163,7 @@ public class BluetoothActivity extends Activity {
 		for (BluetoothDevice device : pairedDevices)
 			BTArrayAdapter.add(device.getName() + "\n" + device.getAddress());
 
-		Toast.makeText(getApplicationContext(), "Show Paired Devices",
-				Toast.LENGTH_SHORT).show();
+		Log.d(LOG_TAG_PROGRESS, "Filled in the list of paired devices");
 
 	}
 
@@ -176,28 +173,34 @@ public class BluetoothActivity extends Activity {
 			// When discovery finds a device
 			if (BluetoothDevice.ACTION_FOUND.equals(action)) {
 				// Get the BluetoothDevice object from the Intent
-				BluetoothDevice device = intent
-						.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+				BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+				Log.d(LOG_TAG_PROGRESS, "Device + " + device.getName()
+						+ " is found. BTArrayAdapter is updated. Observers notified.");
 				// add the name and the MAC address of the object to the
 				foundDevices[found_index++] = device;
 				// arrayAdapter
-				BTArrayAdapter.add(device.getName() + "\n"
-						+ device.getAddress());
+				BTArrayAdapter.add(device.getName() + "\n" + device.getAddress());
 				BTArrayAdapter.notifyDataSetChanged();
 			}
 		}
 	};
 
 	public void find(View view) {
+
 		if (myBluetoothAdapter.isDiscovering()) {
+			Log.d(LOG_TAG_PROGRESS, "Search stopped");
 			// the button is pressed when it discovers, so cancel the discovery
 			myBluetoothAdapter.cancelDiscovery();
+			Toast.makeText(getApplicationContext(), "Search Stopped", Toast.LENGTH_SHORT).show();
 		} else {
+			Log.d(LOG_TAG_PROGRESS,
+					"Search commenced. Arrays cleared for discoveries. Discovery started. Broadcasts sent if something is found.");
 			BTArrayAdapter.clear();
+			foundDevices = new BluetoothDevice[20];
+			found_index = 0;
 			myBluetoothAdapter.startDiscovery();
 
-			registerReceiver(bReceiver, new IntentFilter(
-					BluetoothDevice.ACTION_FOUND));
+			registerReceiver(bReceiver, new IntentFilter(BluetoothDevice.ACTION_FOUND));
 		}
 	}
 
@@ -205,8 +208,7 @@ public class BluetoothActivity extends Activity {
 		myBluetoothAdapter.disable();
 		text.setText("Status: Disconnected");
 
-		Toast.makeText(getApplicationContext(), "Bluetooth turned off",
-				Toast.LENGTH_LONG).show();
+		Toast.makeText(getApplicationContext(), "Bluetooth turned off", Toast.LENGTH_LONG).show();
 	}
 
 	@Override
@@ -215,42 +217,44 @@ public class BluetoothActivity extends Activity {
 		unregisterReceiver(bReceiver);
 	}
 
-	public void getData(BluetoothDevice device) {
-		//
-	}
-
 	private void pairDevice(BluetoothDevice device) {
 		try {
-
-			Method m = device.getClass()
-					.getMethod("createBond", (Class[]) null);
+			Method m = device.getClass().getMethod("createBond", (Class[]) null);
 			m.invoke(device, (Object[]) null);
+			Log.d(LOG_TAG_PROGRESS, "Pairing invoked");
 		} catch (Exception e) {
-			Log.e("result", e.getMessage());
+			Log.d(LOG_TAG_PROGRESS, "Unable to pair.\n" + e.getMessage());
 		}
 	}
 
 	private void unpairDevice(BluetoothDevice device) {
 		try {
-			Method m = device.getClass()
-					.getMethod("removeBond", (Class[]) null);
+			Method m = device.getClass().getMethod("removeBond", (Class[]) null);
 			m.invoke(device, (Object[]) null);
 		} catch (Exception e) {
 			Log.e("result", e.getMessage());
 		}
 	}
 
-	// TODO #1 Added Thread to connect to another device
 	private class ConnectThread extends Thread {
 		private final BluetoothSocket mmSocket;
 		private final BluetoothDevice mmDevice;
 
 		public ConnectThread(BluetoothDevice device) {
+			Log.d(LOG_TAG_PROGRESS, "ConnectionThread initialization started.");
 			// Use a temporary object that is later assigned to mmSocket,
 			// because mmSocket is final
 			BluetoothSocket tmp = null;
 			mmDevice = device;
+
+			String msg = device.getName();
+			Log.d(LOG_TAG_UUID, "just before breaking " + msg);
+			for (ParcelUuid uuid : device.getUuids()) {
+				msg += "\n" + uuid.getUuid().toString();
+			}
+
 			UUID deviceUUID = device.getUuids()[0].getUuid();
+			logToast("UUID from the server is found.", LOG_TAG_PROGRESS);
 
 			// Get a BluetoothSocket to connect with the given BluetoothDevice
 			try {
@@ -260,9 +264,12 @@ public class BluetoothActivity extends Activity {
 			} catch (IOException e) {
 			}
 			mmSocket = tmp;
+			logToast("ConnectionThread initialization completed. Socket acquired.", LOG_TAG_PROGRESS);
 		}
 
 		public void run() {
+			logToast("Connection thread started.", LOG_TAG_PROGRESS);
+
 			// Cancel discovery because it will slow down the connection
 			myBluetoothAdapter.cancelDiscovery();
 
@@ -270,27 +277,39 @@ public class BluetoothActivity extends Activity {
 				// Connect the device through the socket. This will block
 				// until it succeeds or throws an exception
 				mmSocket.connect();
+				logToast("Socket connected.", LOG_TAG_PROGRESS);
 			} catch (IOException connectException) {
 				// Unable to connect; close the socket and get out
 				try {
 					mmSocket.close();
+					logToast("failed. Socket closed because of: " + connectException.getMessage(), LOG_TAG_PROGRESS);
 				} catch (IOException closeException) {
+					logToast("failed. Socket NOT closed because of: " + closeException.getMessage(), LOG_TAG_PROGRESS);
 				}
 				return;
 			}
 
 			// Do work to manage the connection (in a separate thread)
 			// manageConnectedSocket(mmSocket);
-			Toast.makeText(getApplicationContext(),
-					"I should now be connected", Toast.LENGTH_LONG).show();
+			Toast.makeText(getApplicationContext(), "I should now be connected", Toast.LENGTH_SHORT).show();
+			Log.d(LOG_TAG_PROGRESS, "Connection established");
 		}
 
 		/** Will cancel an in-progress connection, and close the socket */
 		public void cancel() {
+			Log.d(LOG_TAG_PROGRESS, "Attempting to close socket.");
 			try {
 				mmSocket.close();
+				Log.d(LOG_TAG_PROGRESS, "Socket closed.");
+
 			} catch (IOException e) {
+				Log.d(LOG_TAG_PROGRESS, "failed. Socket not closed because of: " + e.getMessage());
 			}
 		}
+	}
+	
+	private void logToast(String msg, String tag) {
+		Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT).show();
+		Log.d(tag, msg);
 	}
 }
