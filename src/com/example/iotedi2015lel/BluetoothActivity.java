@@ -3,11 +3,11 @@ package com.example.iotedi2015lel;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Set;
+import java.util.UUID;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -25,7 +25,6 @@ import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
-import java.util.UUID;
 
 public class BluetoothActivity extends Activity {
 
@@ -41,7 +40,6 @@ public class BluetoothActivity extends Activity {
 	private int found_index;
 	private ListView myListView;
 	private ArrayAdapter<String> BTArrayAdapter;
-	private UUID MY_UUID; // TODO - initialize
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -84,17 +82,18 @@ public class BluetoothActivity extends Activity {
 
 				@Override
 				public void onClick(View v) {
-					
-					
+
 					// TODO #1 debugging to show uuid format
-					BluetoothDevice d0 = myBluetoothAdapter.getBondedDevices().iterator().next();
-					String msg = d0.getName();
-					for (ParcelUuid uuid : d0.getUuids()){
-						msg += "\n" + uuid.getUuid().toString();
+					
+					for (BluetoothDevice d0 : myBluetoothAdapter
+							.getBondedDevices()) {
+						String msg = d0.getName();
+						for (ParcelUuid uuid : d0.getUuids()) {
+							msg += "\n" + uuid.getUuid().toString();
+						}
+						Log.d("UUIDS List", msg);
 					}
-					Log.d("UUIDS List", msg);
-					
-					
+
 					list(v);
 				}
 			});
@@ -241,8 +240,7 @@ public class BluetoothActivity extends Activity {
 		}
 	}
 
-	
-	// #1 Added Thread to connect to another device
+	// TODO #1 Added Thread to connect to another device
 	private class ConnectThread extends Thread {
 		private final BluetoothSocket mmSocket;
 		private final BluetoothDevice mmDevice;
@@ -252,12 +250,13 @@ public class BluetoothActivity extends Activity {
 			// because mmSocket is final
 			BluetoothSocket tmp = null;
 			mmDevice = device;
+			UUID deviceUUID = device.getUuids()[0].getUuid();
 
 			// Get a BluetoothSocket to connect with the given BluetoothDevice
 			try {
 				// MY_UUID is the app's UUID string, also used by the server
 				// code
-				tmp = device.createRfcommSocketToServiceRecord(MY_UUID);
+				tmp = device.createRfcommSocketToServiceRecord(deviceUUID);
 			} catch (IOException e) {
 			}
 			mmSocket = tmp;
