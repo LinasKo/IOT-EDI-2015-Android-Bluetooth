@@ -1,4 +1,4 @@
-// Version 1.8.0
+// Version 1.9.0
 package com.example.iotedi2015lel;
 
 import java.io.BufferedReader;
@@ -28,6 +28,7 @@ import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -39,27 +40,39 @@ public class BluetoothActivity extends Activity {
 	private Button offBtn;
 	private Button listBtn;
 	private Button findBtn;
+	private Button toggleBtn;
 	private TextView text;
+	private EditText num1;
+	private EditText num2;
+	private EditText num3;
+	private EditText num4;
+	private Button updateBtn;
 	private BluetoothAdapter myBluetoothAdapter;
 	private Set<BluetoothDevice> pairedDevices;
 	private BluetoothDevice[] foundDevices;
 	private boolean discovered = false;
 	private boolean pair_list_displayed_now = true;
+	private boolean REQUEST_MODE = true;
 	private int found_index;
 	private ListView myListView;
 	private ArrayAdapter<String> BTArrayAdapter;
+	private ConnectThread connectionThread;
+	private DataThread dataThread;
+	private BluetoothSocket zSocket = null;
 
 	private String LOG_TAG_UUID = "UUID List";
 	private String LOG_TAG_PROGRESS = "Progress";
 	private final int MAX_NUMBER_OF_DEVICES = 20;
 	private final boolean secure_sockets = true;
-	private final String MESSAGE = "request\n";
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_bluetooth);
-
+		num1 = (EditText) findViewById(R.id.editText1);
+		num2 = (EditText) findViewById(R.id.editText2);
+		num3 = (EditText) findViewById(R.id.editText3);
+		num4 = (EditText) findViewById(R.id.editText4);
 		// take an instance of BluetoothAdapter - Bluetooth radio
 		myBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 		if (myBluetoothAdapter == null) {
@@ -69,13 +82,14 @@ public class BluetoothActivity extends Activity {
 			findBtn.setEnabled(false);
 			text.setText("Status: not supported");
 
+			
+
 			Toast.makeText(getApplicationContext(), "Your device does not support Bluetooth", Toast.LENGTH_LONG).show();
 		} else {
 
 			foundDevices = new BluetoothDevice[MAX_NUMBER_OF_DEVICES];
 			found_index = 0;
 
-			text = (TextView) findViewById(R.id.text);
 			onBtn = (Button) findViewById(R.id.turnOn);
 			onBtn.setOnClickListener(new OnClickListener() {
 				@Override
@@ -99,11 +113,31 @@ public class BluetoothActivity extends Activity {
 				@Override
 				public void onClick(View v) {
 					if (discovered) {
+						if (dataThread != null)
+							dataThread.cancel();
+						if (connectionThread != null)
+							connectionThread.cancel();
 						pair_list_displayed_now = true;
-						logToast("Clicked on 'Paired List' button", LOG_TAG_PROGRESS);
+						logToast("Clicked on 'Paired List' button. All connections dropped.", LOG_TAG_PROGRESS);
 						list(v);
 					} else {
 						logToast("Rejected as not discovered. Please search for nearby devices first", LOG_TAG_PROGRESS);
+					}
+				}
+			});
+
+			updateBtn = (Button) findViewById(R.id.update);
+			updateBtn.setOnClickListener(new OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					logToast("Update pressed.", LOG_TAG_PROGRESS);
+					if (zSocket != null && zSocket.isConnected()) {
+						REQUEST_MODE = false;
+						manageConnectedSocket(zSocket);
+					} else if (zSocket == null) {
+						logToast("zSocket is null", LOG_TAG_PROGRESS);
+					} else {
+						logToast("zSocket is not connected.", LOG_TAG_PROGRESS);
 					}
 				}
 			});
@@ -113,9 +147,23 @@ public class BluetoothActivity extends Activity {
 
 				@Override
 				public void onClick(View v) {
-					logToast("Searching", LOG_TAG_PROGRESS);
+					if (dataThread != null)
+						dataThread.cancel();
+					if (connectionThread != null)
+						connectionThread.cancel();
+					logToast("Searching. All connections dropped.", LOG_TAG_PROGRESS);
 					discovered = true;
 					find(v);
+				}
+			});
+
+			toggleBtn = (Button) findViewById(R.id.toggle);
+			toggleBtn.setOnClickListener(new OnClickListener() {
+
+				@Override
+				public void onClick(View v) {
+					REQUEST_MODE = !REQUEST_MODE;
+					logToast("Requesting = " + REQUEST_MODE, LOG_TAG_PROGRESS);
 				}
 			});
 
@@ -147,7 +195,7 @@ public class BluetoothActivity extends Activity {
 						}
 						if (myBluetoothAdapter.getBondedDevices().contains(device)) {
 							Log.d(LOG_TAG_PROGRESS, "Devices are paired. Attempting to establish connection.");
-							ConnectThread connectionThread = new ConnectThread(device, secure_sockets);
+							connectionThread = new ConnectThread(device, secure_sockets);
 							connectionThread.start();
 						} else {
 							Log.d(LOG_TAG_PROGRESS, "Devices are not paired. Aborting.");
@@ -305,6 +353,18 @@ public class BluetoothActivity extends Activity {
 			logToast("ConnectionThread initialization completed. Socket acquired.", LOG_TAG_PROGRESS);
 		}
 
+		/** Will cancel an in-progress connection, and close the socket */
+		public void cancel() {
+			Log.d(LOG_TAG_PROGRESS, "Attempting to close socket.");
+			try {
+				mmSocket.close();
+				Log.d(LOG_TAG_PROGRESS, "Socket closed.");
+
+			} catch (IOException e) {
+				Log.d(LOG_TAG_PROGRESS, "failed. Socket not closed because of: " + e.getMessage());
+			}
+		}
+
 		public void run() {
 			Log.d(LOG_TAG_PROGRESS, "Connection thread started.");
 
@@ -315,6 +375,7 @@ public class BluetoothActivity extends Activity {
 				// Connect the device through the socket. This will block
 				// until it succeeds or throws an exception
 				mmSocket.connect();
+				zSocket = mmSocket;
 				Log.d(LOG_TAG_PROGRESS, "Socket connected.");
 			} catch (IOException connectException) {
 				Log.d(LOG_TAG_PROGRESS, "Closing first socket. Trying fallback socket.");
@@ -328,6 +389,7 @@ public class BluetoothActivity extends Activity {
 								.getMethod("createInsecureRfcommSocket", new Class[] { int.class }).invoke(mmDevice, 1);
 
 					fallbackSocket.connect();
+					zSocket = fallbackSocket;
 					Log.d(LOG_TAG_PROGRESS, "Connection successful.");
 				} catch (Exception e) {
 					Log.d(LOG_TAG_PROGRESS, "Closing socket. failed because of " + e.getMessage());
@@ -343,27 +405,24 @@ public class BluetoothActivity extends Activity {
 
 			Log.d(LOG_TAG_PROGRESS, "Connection established");
 
-			manageConnectedSocket(mmSocket);
-		}
-
-		/** Will cancel an in-progress connection, and close the socket */
-		public void cancel() {
-			Log.d(LOG_TAG_PROGRESS, "Attempting to close socket.");
-			try {
-				mmSocket.close();
-				Log.d(LOG_TAG_PROGRESS, "Socket closed.");
-
-			} catch (IOException e) {
-				Log.d(LOG_TAG_PROGRESS, "failed. Socket not closed because of: " + e.getMessage());
-			}
+			// manageConnectedSocket(mmSocket);
 		}
 	}
 
 	private void manageConnectedSocket(BluetoothSocket mmSocket) {
-		DataThread dataThread = new DataThread(mmSocket);
-		dataThread.start();
-		// dataThread.write(MESSAGE);
-		//Log.d(LOG_TAG_PROGRESS, dataThread.read());
+		logToast("Socket is being managed.", LOG_TAG_PROGRESS);
+		dataThread = new DataThread(mmSocket);
+
+		if (REQUEST_MODE) {
+			dataThread.write("request\n");
+			dataThread.start();
+		} else {
+			dataThread.write("update\n");
+			dataThread.write(num1.getText().toString() + "\n");
+			dataThread.write(num2.getText().toString() + "\n");
+			dataThread.write(num3.getText().toString() + "\n");
+			dataThread.write(num4.getText().toString() + "\n");
+		}
 	}
 
 	private class DataThread extends Thread {
@@ -402,22 +461,28 @@ public class BluetoothActivity extends Activity {
 			Log.d(LOG_TAG_PROGRESS, "Data Thread Started");
 			byte[] buffer = new byte[64]; // buffer store for the stream
 			int bytes; // bytes returned from read()
-		 
+
 			// Keep listening to the InputStream until an exception occurs
-			while(true) { Log.d(LOG_TAG_PROGRESS, "Will try?");
-			try { // Read from the InputStream
-				Log.d(LOG_TAG_PROGRESS, "Will read?");
-				bytes = mmInStream.read(buffer);
-				String readMessage = new String(buffer, 0, bytes);
-				// Send the obtained bytes to the UI activity
-				Log.d(LOG_TAG_PROGRESS, "Now I should handle the input");
-				Log.d(LOG_TAG_PROGRESS, readMessage);
-				// mHandler.obtainMessage(MESSAGE_READ, bytes, -1, buffer).sendToTarget();
+			while (true) {
+				Log.d(LOG_TAG_PROGRESS, "Will try?");
+				try { // Read from the InputStream
+					Log.d(LOG_TAG_PROGRESS, "Will read?");
+					bytes = mmInStream.read(buffer);
+					String readMessage = new String(buffer, 0, bytes);
+					// Send the obtained bytes to the UI activity
+					Log.d(LOG_TAG_PROGRESS, "Now I should handle the input");
+					Log.d(LOG_TAG_PROGRESS, readMessage);
+					// mHandler.obtainMessage(MESSAGE_READ, bytes, -1,
+					// buffer).sendToTarget();
 				} catch (IOException e) {
-				Log.d(LOG_TAG_PROGRESS, "Cannot read input buffer. Error: " + e.getMessage()); break; } } }
+					Log.d(LOG_TAG_PROGRESS, "Cannot read input buffer. Error: " + e.getMessage());
+					break;
+				}
+			}
+		}
 
 		public void write(String input) {
-			Log.d(LOG_TAG_PROGRESS, "Sending \"" + MESSAGE + "\"");
+			Log.d(LOG_TAG_PROGRESS, "Sending \"" + input + "\"");
 			byte[] msgBuffer = input.getBytes(); // converts entered String into
 													// bytes
 			try {
@@ -430,14 +495,6 @@ public class BluetoothActivity extends Activity {
 			}
 		}
 
-		/*
-		 * public String read(){ String aString; try { Log.d(LOG_TAG_PROGRESS,
-		 * "Trying to read data."); aString = bufferedReader.readLine(); } catch
-		 * (IOException e) { Log.d(LOG_TAG_PROGRESS, "Data reading failed." +
-		 * e.getMessage()); e.printStackTrace(); return null; } return aString;
-		 * }
-		 */
-		/* Call this from the main activity to shutdown the connection */
 		public void cancel() {
 			try {
 				Log.d(LOG_TAG_PROGRESS, "Closing socket");

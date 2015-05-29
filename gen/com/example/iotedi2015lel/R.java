@@ -24,13 +24,19 @@ public final class R {
         public static final int ic_launcher=0x7f020000;
     }
     public static final class id {
-        public static final int action_settings=0x7f080006;
-        public static final int listView1=0x7f080005;
-        public static final int paired=0x7f080003;
-        public static final int search=0x7f080004;
-        public static final int text=0x7f080000;
+        public static final int action_settings=0x7f08000c;
+        public static final int editText1=0x7f080007;
+        public static final int editText2=0x7f080008;
+        public static final int editText3=0x7f080009;
+        public static final int editText4=0x7f08000a;
+        public static final int linearLayout1=0x7f080000;
+        public static final int listView1=0x7f080006;
+        public static final int paired=0x7f080004;
+        public static final int search=0x7f080005;
+        public static final int toggle=0x7f080003;
         public static final int turnOff=0x7f080002;
         public static final int turnOn=0x7f080001;
+        public static final int update=0x7f08000b;
     }
     public static final class layout {
         public static final int activity_bluetooth=0x7f030000;
