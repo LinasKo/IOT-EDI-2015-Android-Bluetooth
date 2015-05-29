@@ -1,4 +1,4 @@
-// Version 1.5.0
+// Version 1.6.0
 package com.example.iotedi2015lel;
 
 import java.io.IOException;
@@ -41,12 +41,14 @@ public class BluetoothActivity extends Activity {
 	private Set<BluetoothDevice> pairedDevices;
 	private BluetoothDevice[] foundDevices;
 	private boolean discovered = false;
+	private boolean pair_list_displayed_now = true;
 	private int found_index;
 	private ListView myListView;
 	private ArrayAdapter<String> BTArrayAdapter;
 
 	private String LOG_TAG_UUID = "UUID List";
 	private String LOG_TAG_PROGRESS = "Progress";
+	private final int MAX_NUMBER_OF_DEVICES = 20;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -64,6 +66,10 @@ public class BluetoothActivity extends Activity {
 
 			Toast.makeText(getApplicationContext(), "Your device does not support Bluetooth", Toast.LENGTH_LONG).show();
 		} else {
+
+			foundDevices = new BluetoothDevice[MAX_NUMBER_OF_DEVICES];
+			found_index = 0;
+
 			text = (TextView) findViewById(R.id.text);
 			onBtn = (Button) findViewById(R.id.turnOn);
 			onBtn.setOnClickListener(new OnClickListener() {
@@ -88,6 +94,7 @@ public class BluetoothActivity extends Activity {
 				@Override
 				public void onClick(View v) {
 					if (discovered) {
+						pair_list_displayed_now = true;
 						logToast("Clicked on 'Paired List' button", LOG_TAG_PROGRESS);
 						list(v);
 					} else {
@@ -120,13 +127,15 @@ public class BluetoothActivity extends Activity {
 			myListView.setOnItemClickListener(new OnItemClickListener() {
 				@Override
 				public void onItemClick(AdapterView<?> arg0, View arg1, int arg2, long arg3) {
-					BluetoothDevice device = foundDevices[arg2];
-					Toast.makeText(getApplicationContext(), "trying to pair and (or) connect to: " + device.getName(),
-							Toast.LENGTH_SHORT).show();
+					BluetoothDevice device;
+					device = pair_list_displayed_now ? device = getNthSetItem(pairedDevices, arg2) : foundDevices[arg2];
+					// BluetoothDevice device = foundDevices[arg2];
+					// Log.d(LOG_TAG_PROGRESS, "" +
+					// Arrays.asList(foundDevices).contains(device)); // TODO
 					if (!Arrays.asList(foundDevices).contains(device)) {
 						logToast("Device is not in reach. Aborting.", LOG_TAG_PROGRESS);
 					} else {
-						Log.d(LOG_TAG_PROGRESS, "Communicating with " + device.getName());
+						logToast("trying to pair and (or) connect to: " + device.getName(), LOG_TAG_PROGRESS);
 						if (!myBluetoothAdapter.getBondedDevices().contains(device)) {
 							Log.d(LOG_TAG_PROGRESS, "Device not paired with. Pairing");
 							pairDevice(device);
@@ -169,6 +178,9 @@ public class BluetoothActivity extends Activity {
 	}
 
 	public void list(View view) {
+		// the button is pressed when it discovers, so cancel the discovery
+		myBluetoothAdapter.cancelDiscovery();
+
 		// get paired devices
 		pairedDevices = myBluetoothAdapter.getBondedDevices();
 
@@ -194,6 +206,7 @@ public class BluetoothActivity extends Activity {
 				// arrayAdapter
 				BTArrayAdapter.add(device.getName() + "\n" + device.getAddress());
 				BTArrayAdapter.notifyDataSetChanged();
+				pair_list_displayed_now = false;
 			}
 		}
 	};
@@ -209,7 +222,7 @@ public class BluetoothActivity extends Activity {
 			Log.d(LOG_TAG_PROGRESS,
 					"Search commenced. Arrays cleared for discoveries. Discovery started. Broadcasts sent if something is found.");
 			BTArrayAdapter.clear();
-			foundDevices = new BluetoothDevice[20];
+			foundDevices = new BluetoothDevice[MAX_NUMBER_OF_DEVICES];
 			found_index = 0;
 			myBluetoothAdapter.startDiscovery();
 
@@ -334,5 +347,15 @@ public class BluetoothActivity extends Activity {
 	private void logToast(String msg, String tag) {
 		Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT).show();
 		Log.d(tag, msg);
+	}
+
+	private BluetoothDevice getNthSetItem(Set<BluetoothDevice> set, int n) {
+		BluetoothDevice head;
+		do {
+			head = set.iterator().next();
+			if (n-- == 0)
+				return head;
+		} while (head != null);
+		return head;
 	}
 }
