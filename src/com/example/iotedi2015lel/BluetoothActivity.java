@@ -1,8 +1,10 @@
-// Version 1.7.0
+// Version 1.8.0
 package com.example.iotedi2015lel;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -188,6 +190,7 @@ public class BluetoothActivity extends Activity {
 		pairedDevices = myBluetoothAdapter.getBondedDevices();
 
 		// put it's one to the adapter
+		BTArrayAdapter.clear();
 		for (BluetoothDevice device : pairedDevices)
 			BTArrayAdapter.add(device.getName() + "\n" + device.getAddress());
 
@@ -359,15 +362,17 @@ public class BluetoothActivity extends Activity {
 	private void manageConnectedSocket(BluetoothSocket mmSocket) {
 		DataThread dataThread = new DataThread(mmSocket);
 		dataThread.start();
-		//dataThread.write(MESSAGE);
+		// dataThread.write(MESSAGE);
+		//Log.d(LOG_TAG_PROGRESS, dataThread.read());
 	}
 
 	private class DataThread extends Thread {
 		private final BluetoothSocket mmSocket;
 		private final InputStream mmInStream;
 		private final OutputStream mmOutStream;
-		
-		public int readResult;
+
+		private BufferedReader bufferedReader;
+		private InputStreamReader inputReader;
 
 		public DataThread(BluetoothSocket socket) {
 			Log.d(LOG_TAG_PROGRESS, "DataThread initialized.");
@@ -388,49 +393,28 @@ public class BluetoothActivity extends Activity {
 
 			mmInStream = tmpIn;
 			mmOutStream = tmpOut;
+
+			inputReader = new InputStreamReader(mmInStream);
+			bufferedReader = new BufferedReader(inputReader);
 		}
 
-		/*
 		public void run() {
 			Log.d(LOG_TAG_PROGRESS, "Data Thread Started");
 			byte[] buffer = new byte[64]; // buffer store for the stream
 			int bytes; // bytes returned from read()
-
+		 
 			// Keep listening to the InputStream until an exception occurs
-			while (true) {
-				Log.d(LOG_TAG_PROGRESS, "Will try?");
-				try {
-					// Read from the InputStream
-					Log.d(LOG_TAG_PROGRESS, "Will read?");
-					bytes = mmInStream.read(buffer);
-					String readMessage = new String(buffer, 0, bytes);
-					// Send the obtained bytes to the UI activity
-					Log.d(LOG_TAG_PROGRESS, "Now I should handle the input");
-					// mHandler.obtainMessage(MESSAGE_READ, bytes, -1,
-					// buffer).sendToTarget();
+			while(true) { Log.d(LOG_TAG_PROGRESS, "Will try?");
+			try { // Read from the InputStream
+				Log.d(LOG_TAG_PROGRESS, "Will read?");
+				bytes = mmInStream.read(buffer);
+				String readMessage = new String(buffer, 0, bytes);
+				// Send the obtained bytes to the UI activity
+				Log.d(LOG_TAG_PROGRESS, "Now I should handle the input");
+				Log.d(LOG_TAG_PROGRESS, readMessage);
+				// mHandler.obtainMessage(MESSAGE_READ, bytes, -1, buffer).sendToTarget();
 				} catch (IOException e) {
-					Log.d(LOG_TAG_PROGRESS, "Cannot read input buffer. Error: " + e.getMessage());
-					break;
-				}
-			}
-		}
-		*/
-		
-		public void run() {
-			Log.d(LOG_TAG_PROGRESS, "Data Thread Started");
-			byte[] buf = new byte[1];
-		    int tmpLen = 0;
-		    int readLen = 0;
-		    try {
-				while (readLen <= 1 && (tmpLen = mmInStream.read(buf, 0, 1)) > 0) {
-					readResult = buf[0];
-				    readLen += 1;
-				}
-			} catch (IOException e) {
-				Log.d(LOG_TAG_PROGRESS, "Data Thread Started" + e.getMessage());
-			}
-		}
-		
+				Log.d(LOG_TAG_PROGRESS, "Cannot read input buffer. Error: " + e.getMessage()); break; } } }
 
 		public void write(String input) {
 			Log.d(LOG_TAG_PROGRESS, "Sending \"" + MESSAGE + "\"");
@@ -446,6 +430,13 @@ public class BluetoothActivity extends Activity {
 			}
 		}
 
+		/*
+		 * public String read(){ String aString; try { Log.d(LOG_TAG_PROGRESS,
+		 * "Trying to read data."); aString = bufferedReader.readLine(); } catch
+		 * (IOException e) { Log.d(LOG_TAG_PROGRESS, "Data reading failed." +
+		 * e.getMessage()); e.printStackTrace(); return null; } return aString;
+		 * }
+		 */
 		/* Call this from the main activity to shutdown the connection */
 		public void cancel() {
 			try {
