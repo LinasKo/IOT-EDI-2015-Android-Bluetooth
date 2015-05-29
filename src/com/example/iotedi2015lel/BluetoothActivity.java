@@ -142,7 +142,7 @@ public class BluetoothActivity extends Activity {
 						}
 						if (myBluetoothAdapter.getBondedDevices().contains(device)) {
 							Log.d(LOG_TAG_PROGRESS, "Devices are paired. Attempting to establish connection.");
-							ConnectThread connectionThread = new ConnectThread(device);
+							ConnectThread connectionThread = new ConnectThread(device, false);
 							connectionThread.start();
 						} else {
 							Log.d(LOG_TAG_PROGRESS, "Devices are not paired. Aborting.");
@@ -266,13 +266,15 @@ public class BluetoothActivity extends Activity {
 		private final BluetoothSocket mmSocket;
 		private BluetoothSocket fallbackSocket;
 		private final BluetoothDevice mmDevice;
+		private final boolean secure_sockets;
 
-		public ConnectThread(BluetoothDevice device) {
+		public ConnectThread(BluetoothDevice device, boolean secure_sockets) {
 			Log.d(LOG_TAG_PROGRESS, "ConnectionThread initialization started.");
 			// Use a temporary object that is later assigned to mmSocket,
 			// because mmSocket is final
 			BluetoothSocket tmp = null;
 			mmDevice = device;
+			this.secure_sockets = secure_sockets;
 
 			String msg = device.getName();
 			Log.d(LOG_TAG_UUID, "just before breaking " + msg);
@@ -287,7 +289,10 @@ public class BluetoothActivity extends Activity {
 			try {
 				// MY_UUID is the app's UUID string, also used by the server
 				// code
-				tmp = device.createRfcommSocketToServiceRecord(deviceUUID);
+				if (secure_sockets)
+					tmp = device.createRfcommSocketToServiceRecord(deviceUUID);
+				else
+					tmp = device.createInsecureRfcommSocketToServiceRecord(deviceUUID);
 			} catch (IOException e) {
 			}
 			mmSocket = tmp;
@@ -309,8 +314,13 @@ public class BluetoothActivity extends Activity {
 				Log.d(LOG_TAG_PROGRESS, "Closing first socket. Trying fallback socket.");
 				try {
 					mmSocket.close();
-					fallbackSocket = (BluetoothSocket) mmDevice.getClass()
+					if (secure_sockets)
+						fallbackSocket = (BluetoothSocket) mmDevice.getClass()
 							.getMethod("createRfcommSocket", new Class[] { int.class }).invoke(mmDevice, 1);
+					else
+						fallbackSocket = (BluetoothSocket) mmDevice.getClass()
+						.getMethod("createInsecureRfcommSocket", new Class[] { int.class }).invoke(mmDevice, 1);
+				
 					fallbackSocket.connect();
 					Log.d(LOG_TAG_PROGRESS, "Connection successful.");
 				} catch (Exception e) {
